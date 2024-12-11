@@ -1014,262 +1014,261 @@ PHASE 4: Client Management and Komercialist Functionality
 PHASE 5: Order Management and Delivery System
 
 1. Domain Layer Setup:
-   2| a. Create Order Entities:
-   3| `csharp
-4|      public class Order
-5|      {
-6|          public string Id { get; set; }
-7|          public string ClientId { get; set; }
-8|          public Client Client { get; set; }
-9|          public string KomercialistId { get; set; }
-10|          public Komercialist Komercialist { get; set; }
-11|          public DateTime OrderDate { get; set; }
-12|          public string Status { get; set; } // Pending, OnDelivery, Delivered, Cancelled
-13|          public string PaymentMethod { get; set; }
-14|          public string CancellationReason { get; set; }
-15|          public ICollection<OrderItem> OrderItems { get; set; }
-16|          public string DeliveryRouteId { get; set; }
-17|          public DeliveryRoute DeliveryRoute { get; set; }
-18|          public int DeliveryOrder { get; set; } // Order within route
-19|      }
-20|
-21|      public class OrderItem
-22|      {
-23|          public string Id { get; set; }
-24|          public string OrderId { get; set; }
-25|          public Order Order { get; set; }
-26|          public string ProductId { get; set; }
-27|          public Product Product { get; set; }
-28|          public decimal Quantity { get; set; }
-29|          public decimal Price { get; set; }
-30|      }
-31|
-32|      public class DeliveryRoute
-33|      {
-34|          public string Id { get; set; }
-35|          public string Region { get; set; }
-36|          public string SubRegion { get; set; }
-37|          public DateTime DeliveryDate { get; set; }
-38|          public string Status { get; set; }
-39|          public string ShoferId { get; set; }
-40|          public Shofer Shofer { get; set; }
-41|          public int OrderCount { get; set; }
-42|          public ICollection<Order> Orders { get; set; }
-43|      }
-44|      `
-   45|
-   46| b. Create Interfaces:
-   47| `csharp
-48|      public interface IOrderRepository
-49|      {
-50|          Task<Order> GetByIdAsync(string id);
-51|          Task<IEnumerable<Order>> GetByRegionAndDateAsync(string region, DateTime date);
-52|          Task<IEnumerable<Order>> GetByRouteAsync(string routeId);
-53|          Task<bool> CreateAsync(Order order);
-54|          Task<bool> UpdateStatusAsync(string id, string status, string reason = null);
-55|      }
-56|
-57|      public interface IDeliveryRouteRepository
-58|      {
-59|          Task<DeliveryRoute> GetByIdAsync(string id);
-60|          Task<IEnumerable<DeliveryRoute>> GetByDateAsync(DateTime date);
-61|          Task<bool> CreateAsync(DeliveryRoute route);
-62|          Task<bool> AssignDriverAsync(string routeId, string shoferId);
-63|          Task<bool> UpdateOrderSequenceAsync(string routeId, Dictionary<string, int> orderSequence);
-64|      }
-65|      `
-   66|
-   67|2. Infrastructure Layer:
-   68| a. Update DbContext:
-   69| `csharp
-70|      public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
-71|      {
-72|          public DbSet<Order> Orders { get; set; }
-73|          public DbSet<OrderItem> OrderItems { get; set; }
-74|          public DbSet<DeliveryRoute> DeliveryRoutes { get; set; }
-75|
-76|          protected override void OnModelCreating(ModelBuilder builder)
-77|          {
-78|              builder.Entity<Order>()
-79|                  .HasOne(o => o.DeliveryRoute)
-80|                  .WithMany(dr => dr.Orders)
-81|                  .HasForeignKey(o => o.DeliveryRouteId);
-82|
-83|              builder.Entity<OrderItem>()
-84|                  .HasOne(oi => oi.Order)
-85|                  .WithMany(o => o.OrderItems)
-86|                  .HasForeignKey(oi => oi.OrderId);
-87|          }
-88|      }
-89|      `
-   90|
-   91| b. Create Stored Procedures:
-   92| `sql
-93|      DELIMITER //
-94|
-95|      CREATE PROCEDURE CreateOrder(
-96|          IN p_Id VARCHAR(36),
-97|          IN p_ClientId VARCHAR(36),
-98|          IN p_KomercialistId VARCHAR(36),
-99|          IN p_Region VARCHAR(50)
-100|      )
-101|      BEGIN
-102|          DECLARE v_OrderCount INT;
-103|
-104|          -- Get order count for region and today
-105|          SELECT COUNT(*) INTO v_OrderCount
-106|          FROM Orders o
-107|          WHERE o.Region = p_Region
-108|          AND DATE(o.OrderDate) = CURDATE();
-109|
-110|          -- Create order
-111|          INSERT INTO Orders (Id, ClientId, KomercialistId, OrderDate, Status)
-112|          VALUES (p_Id, p_ClientId, p_KomercialistId, NOW(), 'Pending');
-113|
-114|          -- Auto-assign to route based on count
-115|          IF v_OrderCount <= 60 THEN
-116|              -- Logic for 2 routes
-117|          ELSE
-118|              -- Logic for 3 routes
-119|          END IF;
-120|      END //
-121|
-122|      CREATE PROCEDURE GenerateDeliveryRoutes(
-123|          IN p_Region VARCHAR(50),
-124|          IN p_DeliveryDate DATE
-125|      )
-126|      BEGIN
-127|          -- Implementation for route generation
-128|      END //
-129|
-130|      DELIMITER ;
-131|      `
-   132|
-   133|3. Application Layer:
-   134| a. Create DTOs:
-   135| `csharp
-136|      public class OrderDto
-137|      {
-138|          public string Id { get; set; }
-139|          public ClientDto Client { get; set; }
-140|          public DateTime OrderDate { get; set; }
-141|          public string Status { get; set; }
-142|          public string PaymentMethod { get; set; }
-143|          public List<OrderItemDto> Items { get; set; }
-144|      }
-145|
-146|      public class CreateOrderDto
-147|      {
-148|          public string ClientId { get; set; }
-149|          public List<OrderItemCreateDto> Items { get; set; }
-150|      }
-151|
-152|      public class DeliveryRouteDto
-153|      {
-154|          public string Id { get; set; }
-155|          public string Region { get; set; }
-156|          public string SubRegion { get; set; }
-157|          public DateTime DeliveryDate { get; set; }
-158|          public List<OrderDto> Orders { get; set; }
-159|          public int TotalOrders { get; set; }
-160|      }
-161|      `
-   162|
-   163| b. Create Services:
-   164| `csharp
-165|      public interface IOrderService
-166|      {
-167|          Task<OrderDto> CreateOrderAsync(string komercialistId, CreateOrderDto dto);
-168|          Task<OrderDto> UpdateStatusAsync(string id, string status, string reason);
-169|          Task<IEnumerable<OrderDto>> GetByRouteAsync(string routeId);
-170|      }
-171|
-172|      public interface IDeliveryRouteService
-173|      {
-174|          Task<DeliveryRouteDto> GetRouteAsync(string id);
-175|          Task<IEnumerable<DeliveryRouteDto>> GetAvailableRoutesAsync();
-176|          Task<DeliveryRouteDto> AssignDriverAsync(string routeId, string shoferId);
-177|          Task<DeliveryRouteDto> UpdateOrderSequenceAsync(string routeId, UpdateRouteSequenceDto dto);
-178|      }
-179|      `
-   180|
-   181|4. API Layer:
-   182| a. Create Controllers:
-   183| `csharp
-184|      [ApiController]
-185|      [Route("api/[controller]")]
-186|      [Authorize]
-187|      public class OrdersController : ControllerBase
-188|      {
-189|          [HttpPost]
-190|          [Authorize(Roles = "Komercialist")]
-191|          public async Task<ActionResult<OrderDto>> CreateOrder(CreateOrderDto dto)
-192|
-193|          [HttpPut("{id}/status")]
-194|          [Authorize(Roles = "Shofer")]
-195|          public async Task<ActionResult<OrderDto>> UpdateStatus(string id, UpdateOrderStatusDto dto)
-196|      }
-197|
-198|      [ApiController]
-199|      [Route("api/[controller]")]
-200|      [Authorize]
-201|      public class DeliveryRoutesController : ControllerBase
-202|      {
-203|          [HttpGet("available")]
-204|          [Authorize(Roles = "Shofer")]
-205|          public async Task<ActionResult<IEnumerable<DeliveryRouteDto>>> GetAvailableRoutes()
-206|
-207|          [HttpPost("{id}/assign")]
-208|          [Authorize(Roles = "Shofer")]
-209|          public async Task<ActionResult<DeliveryRouteDto>> AssignDriver(string id)
-210|
-211|          [HttpPut("{id}/sequence")]
-212|          [Authorize(Roles = "Shofer")]
-213|          public async Task<ActionResult<DeliveryRouteDto>> UpdateSequence(string id, UpdateRouteSequenceDto dto)
-214|      }
-215|      `
-   216|
-   217|5. Business Rules Implementation:
-   218| a. Route Generation Rules:
-   219| `csharp
-220|      public class RouteGenerationService
-221|      {
-222|          public async Task GenerateRoutesForRegion(string region, DateTime deliveryDate)
-223|          {
-224|              var orders = await _orderRepository.GetByRegionAndDateAsync(region, deliveryDate);
-225|              var orderCount = orders.Count();
-226|
-227|              if (orderCount <= 60)
-228|              {
-229|                  await CreateTwoRoutes(orders, region, deliveryDate);
-230|              }
-231|              else
-232|              {
-233|                  await CreateThreeRoutes(orders, region, deliveryDate);
-234|              }
-235|          }
-236|      }
-237|      `
-   238|
-   239|6. Testing:
-   240| a. Unit Tests:
-   241| - Order service tests
-   242| - Route generation tests
-   243| - Business rules tests
-   244|
-   245| b. Integration Tests:
-   246| - Order creation flow
-   247| - Route assignment
-   248| - Status updates
-   249|
-   250|7. Manual Testing:
-   251| a. Test Scenarios:
-   252| - Create orders
-   253| - Route generation
-   254| - Driver assignment
-   255| - Order sequence updates
-   256| - Status updates
-   257|```
+    a. Create Order Entities:
+    `csharp
+      public class Order
+      {
+          public string Id { get; set; }
+          public string ClientId { get; set; }
+          public Client Client { get; set; }
+          public string KomercialistId { get; set; }
+          public Komercialist Komercialist { get; set; }
+          public DateTime OrderDate { get; set; }
+          public string Status { get; set; } // Pending, OnDelivery, Delivered, Cancelled
+          public string PaymentMethod { get; set; }
+          public string CancellationReason { get; set; }
+          public ICollection<OrderItem> OrderItems { get; set; }
+          public string DeliveryRouteId { get; set; }
+          public DeliveryRoute DeliveryRoute { get; set; }
+          public int DeliveryOrder { get; set; } // Order within route
+      }
+
+      public class OrderItem
+      {
+          public string Id { get; set; }
+          public string OrderId { get; set; }
+          public Order Order { get; set; }
+          public string ProductId { get; set; }
+          public Product Product { get; set; }
+          public decimal Quantity { get; set; }
+          public decimal Price { get; set; }
+      }
+
+      public class DeliveryRoute
+      {
+          public string Id { get; set; }
+          public string Region { get; set; }
+          public string SubRegion { get; set; }
+          public DateTime DeliveryDate { get; set; }
+          public string Status { get; set; }
+          public string ShoferId { get; set; }
+          public Shofer Shofer { get; set; }
+          public int OrderCount { get; set; }
+          public ICollection<Order> Orders { get; set; }
+      }
+      `
+
+ b. Create Interfaces:
+ `csharp
+      public interface IOrderRepository
+      {
+          Task<Order> GetByIdAsync(string id);
+          Task<IEnumerable<Order>> GetByRegionAndDateAsync(string region, DateTime date);
+          Task<IEnumerable<Order>> GetByRouteAsync(string routeId);
+          Task<bool> CreateAsync(Order order);
+          Task<bool> UpdateStatusAsync(string id, string status, string reason = null);
+      }
+
+      public interface IDeliveryRouteRepository
+      {
+          Task<DeliveryRoute> GetByIdAsync(string id);
+          Task<IEnumerable<DeliveryRoute>> GetByDateAsync(DateTime date);
+          Task<bool> CreateAsync(DeliveryRoute route);
+          Task<bool> AssignDriverAsync(string routeId, string shoferId);
+          Task<bool> UpdateOrderSequenceAsync(string routeId, Dictionary<string, int> orderSequence);
+      }
+      `
+
+2. Infrastructure Layer:
+ a. Update DbContext:
+   `csharp
+      public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+      {
+          public DbSet<Order> Orders { get; set; }
+          public DbSet<OrderItem> OrderItems { get; set; }
+          public DbSet<DeliveryRoute> DeliveryRoutes { get; set; }
+
+          protected override void OnModelCreating(ModelBuilder builder)
+          {
+              builder.Entity<Order>()
+                  .HasOne(o => o.DeliveryRoute)
+                  .WithMany(dr => dr.Orders)
+                  .HasForeignKey(o => o.DeliveryRouteId);
+
+              builder.Entity<OrderItem>()
+                  .HasOne(oi => oi.Order)
+                  .WithMany(o => o.OrderItems)
+                  .HasForeignKey(oi => oi.OrderId);
+          }
+      }
+      `
+
+    b. Create Stored Procedures:
+    `sql
+      DELIMITER //
+
+      CREATE PROCEDURE CreateOrder(
+          IN p_Id VARCHAR(36),
+          IN p_ClientId VARCHAR(36),
+          IN p_KomercialistId VARCHAR(36),
+          IN p_Region VARCHAR(50)
+      )
+      BEGIN
+          DECLARE v_OrderCount INT;
+
+          -- Get order count for region and today
+          SELECT COUNT(*) INTO v_OrderCount
+          FROM Orders o
+          WHERE o.Region = p_Region
+          AND DATE(o.OrderDate) = CURDATE();
+
+          -- Create order
+          INSERT INTO Orders (Id, ClientId, KomercialistId, OrderDate, Status)
+          VALUES (p_Id, p_ClientId, p_KomercialistId, NOW(), 'Pending');
+
+          -- Auto-assign to route based on count
+          IF v_OrderCount <= 60 THEN
+              -- Logic for 2 routes
+         ELSE
+              -- Logic for 3 routes
+          END IF;
+      END //
+      CREATE PROCEDURE GenerateDeliveryRoutes(
+          IN p_Region VARCHAR(50),
+          IN p_DeliveryDate DATE
+      )
+      BEGIN
+          -- Implementation for route generation
+      END //
+
+      DELIMITER ;
+      `
+   
+   3. Application Layer:
+    a. Create DTOs:
+    `csharp
+      public class OrderDto
+      {
+          public string Id { get; set; }
+          public ClientDto Client { get; set; }
+          public DateTime OrderDate { get; set; }
+          public string Status { get; set; }
+          public string PaymentMethod { get; set; }
+          public List<OrderItemDto> Items { get; set; }
+      }
+
+      public class CreateOrderDto
+      {
+          public string ClientId { get; set; }
+          public List<OrderItemCreateDto> Items { get; set; }
+      }
+
+      public class DeliveryRouteDto
+      {
+          public string Id { get; set; }
+          public string Region { get; set; }
+          public string SubRegion { get; set; }
+          public DateTime DeliveryDate { get; set; }
+          public List<OrderDto> Orders { get; set; }
+          public int TotalOrders { get; set; }
+      }
+      `
+
+ b. Create Services:
+ `csharp
+      public interface IOrderService
+      {
+          Task<OrderDto> CreateOrderAsync(string komercialistId, CreateOrderDto dto);
+          Task<OrderDto> UpdateStatusAsync(string id, string status, string reason);
+          Task<IEnumerable<OrderDto>> GetByRouteAsync(string routeId);
+      }
+
+      public interface IDeliveryRouteService
+      {
+          Task<DeliveryRouteDto> GetRouteAsync(string id);
+          Task<IEnumerable<DeliveryRouteDto>> GetAvailableRoutesAsync();
+         Task<DeliveryRouteDto> AssignDriverAsync(string routeId, string shoferId);
+          Task<DeliveryRouteDto> UpdateOrderSequenceAsync(string routeId, UpdateRouteSequenceDto dto);
+      }
+      `
+   
+   4. API Layer:
+    a. Create Controllers:
+    `csharp
+      [ApiController]
+      [Route("api/[controller]")]
+      [Authorize]
+      public class OrdersController : ControllerBase
+      {
+          [HttpPost]
+          [Authorize(Roles = "Komercialist")]
+          public async Task<ActionResult<OrderDto>> CreateOrder(CreateOrderDto dto)
+
+          [HttpPut("{id}/status")]
+          [Authorize(Roles = "Shofer")]
+          public async Task<ActionResult<OrderDto>> UpdateStatus(string id, UpdateOrderStatusDto dto)
+      }
+
+      [ApiController]
+      [Route("api/[controller]")]
+      [Authorize]
+      public class DeliveryRoutesController : ControllerBase
+      {
+          [HttpGet("available")]
+          [Authorize(Roles = "Shofer")]
+          public async Task<ActionResult<IEnumerable<DeliveryRouteDto>>> GetAvailableRoutes()
+
+          [HttpPost("{id}/assign")]
+          [Authorize(Roles = "Shofer")]
+          public async Task<ActionResult<DeliveryRouteDto>> AssignDriver(string id)
+
+          [HttpPut("{id}/sequence")]
+         [Authorize(Roles = "Shofer")]
+          public async Task<ActionResult<DeliveryRouteDto>> UpdateSequence(string id, UpdateRouteSequenceDto dto)
+      }
+      `
+   
+   5. Business Rules Implementation:
+    a. Route Generation Rules:
+    `csharp
+      public class RouteGenerationService
+      {
+          public async Task GenerateRoutesForRegion(string region, DateTime deliveryDate)
+          {
+              var orders = await _orderRepository.GetByRegionAndDateAsync(region, deliveryDate);
+              var orderCount = orders.Count();
+
+              if (orderCount <= 60)
+              {
+                  await CreateTwoRoutes(orders, region, deliveryDate);
+              }
+             else
+              {
+                  await CreateThreeRoutes(orders, region, deliveryDate);
+              }
+          }
+      }
+      `
+   
+   6. Testing:
+    a. Unit Tests:
+    - Order service tests
+    - Route generation tests
+    - Business rules tests
+   
+    b. Integration Tests:
+    - Order creation flow
+    - Route assignment
+    - Status updates
+   
+   7. Manual Testing:
+    a. Test Scenarios:
+    - Create orders
+    - Route generation
+    - Driver assignment
+    - Order sequence updates
+    - Status updates
+   ```
 
 PHASE 6: Reporting and Analytics System
 
