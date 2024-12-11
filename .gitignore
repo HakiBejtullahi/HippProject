@@ -1,0 +1,36 @@
+## .NET Core
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+## VS Code directory
+.vscode/
+
+## Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+## Rider
+.idea/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Logs
+logs/
+*.log
+
+## Environment variables
+.env
+.env.local
+.env.*.local
+appsettings.Development.json
+appsettings.Production.json
